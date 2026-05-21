@@ -4,7 +4,9 @@ from telegram import (
     ReplyKeyboardMarkup,
     KeyboardButton,
     Update,
+    MessageEntity,
 )
+from telegram.constants import MessageEntityType
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -37,7 +39,7 @@ CHANNELS = [
 ]
 
 LOG_CHANNEL         = -1003792761013
-IMAGE_URL           = "https://i.ibb.co/W4SpQX1C/IMG-20260521-090418-265.jpg"
+IMAGE_URL           = "https://i.ibb.co/r2yhpkRt/file-000000008a307206b781c13f46429283.png"
 POINTS_PER_REFERRAL = 20
 MINIMUM_WITHDRAW    = 100
 GPLAY_ALLOWED       = [100, 200, 500, 1000]
@@ -54,6 +56,28 @@ gift_col     = db["gifts"]
 
 users_col.create_index("user_id", unique=True)
 gift_col.create_index("code", unique=True)
+
+# ==================== PREMIUM EMOJI IDs ====================
+
+CE_EYES   = 6073560459259154410
+CE_BOLT   = 6073141291925902314
+CE_CHART  = 6071028722067051200
+CE_PIN    = 6073112202112405609
+CE_FIRE   = 6070966926077596386
+CE_MAIL   = 6071282400015422029
+CE_PLAY   = 6070907015578785017
+CE_COOL   = 6248810784386716443
+CE_STAR   = 6305292237144065624
+CE_PHONE  = 5373130604147654226
+
+def _ce(emoji: str, custom_id: int, offset: int) -> MessageEntity:
+    """Build a CUSTOM_EMOJI MessageEntity."""
+    return MessageEntity(
+        type=MessageEntityType.CUSTOM_EMOJI,
+        offset=offset,
+        length=len(emoji.encode("utf-16-le")) // 2,
+        custom_emoji_id=str(custom_id),
+    )
 
 # ==================== HELPERS ====================
 
@@ -201,14 +225,18 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     caption = (
-        "💎 *FREE PLAY STORE CODES*\n\n"
-        "🔥 Premium Rewards\n"
-        "⚡ Instant Verification\n"
-        "📈 Daily Giveaways\n\n"
-        "━━━━━━━━━━━━━━\n\n"
-        "➊ Join Both Channels\n"
-        "➋ Click Verify\n"
-        "➌ Unlock Rewards"
+        "🔥 𝗣𝗥𝗘𝗠𝗜𝗨𝗠 𝗥𝗘𝗪𝗔𝗥𝗗 𝗖𝗢𝗠𝗠𝗨𝗡𝗜𝗧𝗬 🔥\n\n"
+        "⚡ Free Play Store Codes ⚡\n\n"
+        "👀 ══════════════════ 👀\n\n"
+        "📈 Instant Rewards  •  Daily Giveaways\n"
+        "⭐ Fast Withdraw  •  Trusted Members\n"
+        "😎 Premium Earning Experience 😎\n\n"
+        "👀 ══════════════════ 👀\n\n"
+        "▶️ How to get started:\n\n"
+        "  ➊  Join Both Channels Below\n"
+        "  ➋  Tap ✅ Verify Button\n"
+        "  ➌  Unlock Your Rewards 🎁\n\n"
+        "⚡ Join now & start earning instantly! ⚡"
     )
     await update.message.reply_photo(
         photo=IMAGE_URL,
@@ -226,10 +254,13 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending = withdraw_col.count_documents({"status": "pending"})
     banned  = users_col.count_documents({"banned": 1})
     await update.message.reply_text(
-        f"⚙️ *ADMIN PANEL*\n\n"
-        f"👥 Total Users: `{total}`\n"
-        f"💸 Pending Withdrawals: `{pending}`\n"
-        f"🚫 Banned Users: `{banned}`",
+        f"⚡ *ADMIN CONTROL PANEL* ⚡\n\n"
+        f"📌 ══════════════════ 📌\n\n"
+        f"👀 Total Users ›  `{total}`\n"
+        f"🔥 Pending Payouts ›  `{pending}`\n"
+        f"📈 Banned Users ›  `{banned}`\n\n"
+        f"📌 ══════════════════ 📌\n\n"
+        f"😎 Select an action below:",
         parse_mode="Markdown",
         reply_markup=admin_keyboard(),
     )
@@ -275,11 +306,21 @@ async def cb_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
     await query.edit_message_caption(
-        caption="✅ *Verification Successful!*\n\n💎 Reward access unlocked.",
+        caption=(
+            "⭐ *VERIFICATION SUCCESSFUL!* ⭐\n\n"
+            "🔥 ══════════════════ 🔥\n\n"
+            "😎 Welcome to the Premium Community!\n"
+            "⚡ Your reward access is now *UNLOCKED*\n\n"
+            "📈 Start earning points today:\n"
+            "  • Refer friends  →  +20 pts each\n"
+            "  • Claim gift codes  →  Bonus pts\n"
+            "  • Daily giveaways  →  Free rewards\n\n"
+            "🔥 ══════════════════ 🔥"
+        ),
         parse_mode="Markdown",
     )
     await query.message.reply_text(
-        "🏠 *Main Menu*",
+        "⚡ *Welcome — Choose an option below* ⚡",
         parse_mode="Markdown",
         reply_markup=main_menu(),
     )
@@ -378,10 +419,15 @@ async def cb_payout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 w["user_id"],
-                "✅ *Your UPI Withdrawal Has Been Paid!*\n\n"
-                f"⭐ Amount: `{w['amount']}` points\n"
-                f"💳 UPI ID: `{w.get('upi_id', '—')}`\n\n"
-                "Thank you for using our platform! 🎉",
+                f"⭐ *PAYOUT COMPLETED!* ⭐\n\n"
+                f"🔥 ══════════════════ 🔥\n\n"
+                f"😎 Your withdrawal has been processed!\n\n"
+                f"📈 Amount Paid  ›  `{w['amount']}` pts\n"
+                f"🏦 UPI ID  ›  `{w.get('upi_id', '—')}`\n"
+                f"⚡ Method  ›  UPI Transfer\n\n"
+                f"🔥 ══════════════════ 🔥\n\n"
+                f"👀 Thank you for being part of our\n"
+                f"📌 Premium Reward Community! 📈",
                 parse_mode="Markdown",
             )
         except Exception:
@@ -478,14 +524,24 @@ async def cb_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_pending":
         pending = list(withdraw_col.find({"status": "pending"}).limit(10))
         if not pending:
-            await query.message.reply_text("✅ No pending withdrawals.")
+            await query.message.reply_text(
+                "⭐ *No Pending Withdrawals* ⭐\n\n"
+                "🔥 All payouts are cleared! 😎",
+                parse_mode="Markdown",
+            )
             return
-        lines = ["💸 *Pending Withdrawals (latest 10)*\n"]
-        for w in pending:
+        lines = [
+            "⚡ *PENDING PAYOUTS* ⚡\n\n"
+            "📌 ══════════════════ 📌\n"
+        ]
+        for idx, w in enumerate(pending, 1):
             dest = w.get("upi_id") or w.get("method", "—")
             lines.append(
-                f"👤 `{w['user_id']}` | ⭐ {w['amount']} pts | `{dest}`"
+                f"🔥 #{idx}  👀 `{w['user_id']}`\n"
+                f"   📈 Amount › `{w['amount']}` pts\n"
+                f"   ⭐ Dest  › `{dest}`\n"
             )
+        lines.append("📌 ══════════════════ 📌")
         await query.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 # ==================== SINGLE MESSAGE HANDLER ====================
@@ -636,14 +692,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(
                     target_uid,
-                    f"🎉 *Withdraw Completed!*\n\n"
-                    f"━━━━━━━━━━━━━━\n\n"
-                    f"🏦 Method:\nGoogle Play Code\n\n"
-                    f"⭐ Points Redeemed: `{amount}`\n\n"
-                    f"🎁 Your Redeem Code:\n\n"
-                    f"`{redeem_code}`\n\n"
-                    f"━━━━━━━━━━━━━━\n\n"
-                    f"Thank you! Enjoy your reward 🎮",
+                    f"⭐ *PAYOUT COMPLETED!* ⭐\n\n"
+                    f"🔥 ══════════════════ 🔥\n\n"
+                    f"😎 Your Google Play code is here!\n\n"
+                    f"📱 Method  ›  Google Play Code\n"
+                    f"📈 Points Redeemed  ›  `{amount}` pts\n\n"
+                    f"⚡ ══════ Your Code Below ══════ ⚡\n\n"
+                    f"🎁 `{redeem_code}`\n\n"
+                    f"⚡ ══════════════════════════ ⚡\n\n"
+                    f"👀 Redeem it on Google Play Store!\n"
+                    f"🔥 Keep earning — more rewards await! 📌",
                     parse_mode="Markdown",
                 )
             except Exception:
@@ -676,11 +734,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(
                     target_uid,
-                    f"❌ *Withdraw Rejected*\n\n"
-                    f"━━━━━━━━━━━━━━\n\n"
-                    f"Reason:\n{reason}\n\n"
-                    f"━━━━━━━━━━━━━━\n\n"
-                    f"⭐ `{amount}` points have been refunded to your wallet.",
+                    f"⚡ *WITHDRAWAL UPDATE* ⚡\n\n"
+                    f"📌 ══════════════════ 📌\n\n"
+                    f"👀 Unfortunately your withdrawal\n"
+                    f"request could not be processed.\n\n"
+                    f"🔥 Reason:\n{reason}\n\n"
+                    f"📌 ══════════════════ 📌\n\n"
+                    f"⭐ `{amount}` pts have been *refunded*\n"
+                    f"📈 to your wallet automatically.\n\n"
+                    f"😎 Try again or contact support @Genzayu",
                     parse_mode="Markdown",
                 )
             except Exception:
@@ -760,9 +822,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gift_col.update_one({"code": code}, {"$push": {"claimed": user_id}})
         clear_states(context)
         await update.message.reply_text(
-            f"🎉 *Red Envelope Opened!*\n\n"
-            f"🧧 Code: `{code}`\n"
-            f"⭐ +{reward} Points added to your wallet!",
+            f"🧧 *RED ENVELOPE OPENED!* 🧧\n\n"
+            f"🔥 ══════════════════ 🔥\n\n"
+            f"😎 Congratulations! You claimed it!\n\n"
+            f"📌 Gift Code  ›  `{code}`\n"
+            f"⭐ Points Added  ›  `+{reward}` pts\n\n"
+            f"🔥 ══════════════════ 🔥\n\n"
+            f"📈 Check your wallet to see your balance!\n"
+            f"⚡ Keep referring to earn even more! 👀",
             parse_mode="Markdown",
         )
         return
@@ -832,22 +899,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clear_states(context)
 
         await update.message.reply_text(
-            f"✅ *Withdrawal Request Submitted!*\n\n"
-            f"⭐ Amount: `{amount}` points\n"
-            f"🏦 Method: UPI\n"
-            f"💳 UPI: `{upi_id}`\n"
-            f"📋 Status: *Pending*\n\n"
-            f"You will be notified once processed.",
+            f"⭐ *WITHDRAWAL REQUEST SENT!* ⭐\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"📌 Amount  ›  `{amount}` pts\n"
+            f"🏦 Method  ›  UPI Transfer\n"
+            f"📱 UPI ID  ›  `{upi_id}`\n"
+            f"🔥 Status  ›  *Pending Review*\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"😎 You'll be notified once processed!\n"
+            f"👀 Avg processing time: 24 hours 📈",
             parse_mode="Markdown",
             reply_markup=main_menu(),
         )
 
         log_text = (
-            f"💸 *NEW WITHDRAW REQUEST*\n\n"
-            f"👤 User ID:\n`{user_id}`\n\n"
-            f"💰 Amount:\n`{amount}`\n\n"
-            f"🏦 Method:\nUPI\n\n"
-            f"💳 UPI:\n`{upi_id}`"
+            f"🔥 *NEW WITHDRAW REQUEST* 🔥\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"👀 User ID  ›  `{user_id}`\n\n"
+            f"📈 Amount  ›  `{amount}` pts\n\n"
+            f"🏦 Method  ›  UPI Transfer\n\n"
+            f"📱 UPI ID  ›  `{upi_id}`\n\n"
+            f"⚡ ══════════════════ ⚡"
         )
         try:
             await context.bot.send_message(
@@ -956,22 +1028,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         clear_states(context)
 
         await update.message.reply_text(
-            f"✅ *Withdrawal Request Submitted!*\n\n"
-            f"⭐ Amount: `{amount}` points\n"
-            f"🏦 Method: Google Play Code\n"
-            f"📧 Gmail: `{gmail}`\n"
-            f"📋 Status: *Pending*\n\n"
-            f"You will be notified once processed.",
+            f"⭐ *WITHDRAWAL REQUEST SENT!* ⭐\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"📌 Amount  ›  `{amount}` pts\n"
+            f"📱 Method  ›  Google Play Code\n"
+            f"✉️ Gmail  ›  `{gmail}`\n"
+            f"🔥 Status  ›  *Pending Review*\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"😎 Your code will be sent to your Gmail!\n"
+            f"👀 Avg processing time: 24 hours 📈",
             parse_mode="Markdown",
             reply_markup=main_menu(),
         )
 
         log_text = (
-            f"💸 *NEW WITHDRAW REQUEST*\n\n"
-            f"👤 User ID:\n`{user_id}`\n\n"
-            f"💰 Amount:\n`{amount}`\n\n"
-            f"🏦 Method:\nGoogle Play Code\n\n"
-            f"📧 Gmail:\n`{gmail}`"
+            f"🔥 *NEW WITHDRAW REQUEST* 🔥\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"👀 User ID  ›  `{user_id}`\n\n"
+            f"📈 Amount  ›  `{amount}` pts\n\n"
+            f"📱 Method  ›  Google Play Code\n\n"
+            f"✉️ Gmail  ›  `{gmail}`\n\n"
+            f"⚡ ══════════════════ ⚡"
         )
         try:
             await context.bot.send_message(
@@ -997,13 +1074,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         referrals = user_data.get("referrals", 0)
         upi       = user_data.get("upi") or "Not set"
         await update.message.reply_text(
-            f"💰 *Your Wallet*\n\n"
-            f"👥 Referrals: `{referrals}`\n"
-            f"⭐ Points: `{points}`\n"
-            f"🏦 UPI: `{upi}`\n\n"
-            f"━━━━━━━━━━━━━━\n\n"
-            f"🎁 Per Referral: `{POINTS_PER_REFERRAL}`\n"
-            f"💎 Minimum Withdraw: `{MINIMUM_WITHDRAW}`",
+            f"💰 *YOUR PREMIUM WALLET* 💰\n\n"
+            f"⭐ ══════════════════ ⭐\n\n"
+            f"📈 Points Balance  ›  `{points}` pts\n"
+            f"👀 Total Referrals  ›  `{referrals}` users\n"
+            f"🏦 UPI Address  ›  `{upi}`\n\n"
+            f"⭐ ══════════════════ ⭐\n\n"
+            f"⚡ Per Referral  ›  `{POINTS_PER_REFERRAL}` pts\n"
+            f"🔥 Min Withdraw  ›  `{MINIMUM_WITHDRAW}` pts\n\n"
+            f"😎 Keep earning — keep growing! 📈",
             parse_mode="Markdown",
         )
 
@@ -1022,12 +1101,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         referrals = user_data.get("referrals", 0)
         link      = f"https://t.me/{BOT_USERNAME}?start={user_id}"
         await update.message.reply_text(
-            f"👥 *Your Referral Link*\n\n"
+            f"👀 *YOUR REFERRAL PROGRAM* 👀\n\n"
+            f"🔥 ══════════════════ 🔥\n\n"
+            f"📌 Your Invite Link:\n\n"
             f"`{link}`\n\n"
-            f"━━━━━━━━━━━━━━\n\n"
-            f"👤 Referrals: `{referrals}`\n"
-            f"⭐ Points: `{points}`\n\n"
-            f"🎁 Earn *{POINTS_PER_REFERRAL} points* per referral",
+            f"🔥 ══════════════════ 🔥\n\n"
+            f"📈 Total Referrals  ›  `{referrals}` users\n"
+            f"⭐ Points Earned  ›  `{points}` pts\n\n"
+            f"⚡ Earn *{POINTS_PER_REFERRAL} points* for every friend you invite!\n\n"
+            f"😎 Share & watch your balance grow 📈",
             parse_mode="Markdown",
         )
 
@@ -1042,10 +1124,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         await update.message.reply_text(
-            f"💎 *Withdraw Request*\n\n"
-            f"💰 Your Balance: `{points}` points\n"
-            f"📋 Minimum: `{MINIMUM_WITHDRAW}` points\n\n"
-            f"Choose your withdrawal method:",
+            f"💎 *WITHDRAW REQUEST* 💎\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"📈 Your Balance  ›  `{points}` pts\n"
+            f"🔥 Minimum Required  ›  `{MINIMUM_WITHDRAW}` pts\n\n"
+            f"⚡ ══════════════════ ⚡\n\n"
+            f"😎 Choose your preferred payout method:",
             parse_mode="Markdown",
             reply_markup=withdraw_method_keyboard(),
         )
@@ -1063,24 +1147,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "☎️ Support":
         await update.message.reply_text(
-            "☎️ *Support*\n\n👤 Contact: @Genzayu",
+            "✉️ *PREMIUM SUPPORT* ✉️\n\n"
+            "📌 ══════════════════ 📌\n\n"
+            "😎 Having an issue? We've got you!\n\n"
+            "⚡ Contact our support team:\n"
+            "  👀 Admin  ›  @Genzayu\n\n"
+            "🔥 Response time: Usually within 24h\n\n"
+            "📌 ══════════════════ 📌\n\n"
+            "📱 We're here to help you earn more! 📈",
             parse_mode="Markdown",
         )
 
     elif text == "🏠 Home":
         caption = (
-            "💎 *FREE PLAY STORE REDEEM CODES*\n\n"
-            "🔥 Daily Premium Rewards\n"
-            "⚡ Instant Withdraw System\n"
-            "✅ Trusted Reward Community\n\n"
-            "━━━━━━━━━━━━━━\n\n"
-            "🎁 *Available Rewards:*\n\n"
-            "• Play Store Codes\n"
-            "• Premium Gift Codes\n"
-            "• Daily Giveaway Access\n"
-            "• Referral Rewards\n\n"
-            "━━━━━━━━━━━━━━\n\n"
-            "👥 Invite Friends & Earn More"
+            "🔥 *PREMIUM REWARD COMMUNITY* 🔥\n\n"
+            "⭐ Free Play Store Redeem Codes ⭐\n\n"
+            "👀 ══════════════════ 👀\n\n"
+            "⚡ *What's waiting for you:*\n\n"
+            "  📈  Play Store Gift Codes\n"
+            "  🎁  Exclusive Premium Gift Codes\n"
+            "  🔥  Daily Giveaway Access\n"
+            "  😎  Referral Bonus Rewards\n"
+            "  ▶️  Instant Withdraw System\n\n"
+            "👀 ══════════════════ 👀\n\n"
+            "📌 Invite friends & multiply your points!\n"
+            "⚡ Fast  •  Trusted  •  Premium 😎"
         )
         await update.message.reply_photo(
             photo=IMAGE_URL,
