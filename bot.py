@@ -27,12 +27,12 @@ logger = logging.getLogger(__name__)
 
 # ==================== CONFIG ====================
 
-TOKEN        = "8648638779:AAHqrt2XY0mtQaSiUm2IGH6Ufq7qP3HU76g"
+TOKEN        = "8994134922:AAEzbgLS4FUUpmJ3uQSWQPqDZ-pSLDZamuU"
 ADMIN_ID     = 8575787439
 BOT_USERNAME = "FreeRedeemCodez1Robot"
 
 CHANNELS = [
-    {"id": -1002490723980, "url": "https://t.me/+VqJTt74UgI4xOTI1", "name": "Channel 1"},
+    {"id": -1003745950290, "url": "https://t.me/+Lypb3Q0meWc5YzU1", "name": "Channel 1"},
     {"id": -1003599814306, "url": "https://t.me/+f1s1iq_weZk5OGRl", "name": "Channel 2"},
 ]
 
@@ -134,7 +134,7 @@ async def all_joined(bot, user_id: int) -> bool:
 
 def join_keyboard() -> InlineKeyboardMarkup:
     buttons = [
-        [InlineKeyboardButton(f"📢 Join {ch['name']}", url=ch["url"])]
+        [InlineKeyboardButton(f" Join {ch['name']}", url=ch["url"])]
         for ch in CHANNELS
     ]
     buttons.append([InlineKeyboardButton("✅ I Joined — Verify", callback_data="verify")])
