@@ -742,7 +742,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"📌 ══════════════════ 📌\n\n"
                     f"⭐ `{amount}` pts have been *refunded*\n"
                     f"📈 to your wallet automatically.\n\n"
-                    f"😎 Try again or contact support @Genzayu",
+                    f"😎 Try again or contact support @ASHUH4REEE",
                     parse_mode="Markdown",
                 )
             except Exception:
