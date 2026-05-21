@@ -310,39 +310,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ensure_user(user_id)
     state = context.user_data.get("state", "")
 
-    # ── Admin states ────────────────────────────────────────────────────────
+    # ── ADMIN STATES — checked first, always return, never fall through ──────
 
-    if user_id == ADMIN_ID:
+    if user_id == ADMIN_ID and state:
 
+        # ── Generate Gift Code ───────────────────────────────────────────────
         if state == "await_gift_amount":
             try:
                 amount = int(text)
                 if amount <= 0:
                     raise ValueError
             except ValueError:
-                await update.message.reply_text("❌ Enter a valid positive number.")
+                await update.message.reply_text(
+                    "❌ *Invalid amount.*\n\nSend a positive number only.\nExample: `500`",
+                    parse_mode="Markdown",
+                )
                 return
 
             code = generate_code()
-            # Ensure uniqueness
             while gift_col.find_one({"code": code}):
                 code = generate_code()
 
-            gift_col.insert_one({"code": code, "points": amount, "claimed": False, "claimed_by": None})
+            gift_col.insert_one({
+                "code": code,
+                "amount": amount,
+                "claimed": [],          # list of user_ids who claimed
+            })
             context.user_data.clear()
             await update.message.reply_text(
-                f"🎁 *Gift Code Generated*\n\n"
-                f"🧧 Code: `{code}`\n"
-                f"⭐ Reward: `{amount}` Points\n\n"
-                f"Share this code with users via Red Envelope.",
+                f"✅ *Gift Code Generated*\n\n"
+                f"🎁 Code: `{code}`\n"
+                f"💎 Amount: `{amount}` Points\n\n"
+                f"Share this code via Red Envelope 🧧",
                 parse_mode="Markdown",
             )
             return
 
+        # ── Broadcast ────────────────────────────────────────────────────────
         if state == "await_broadcast":
-            users = list(users_col.find({"banned": 0}))
+            all_users = list(users_col.find({"banned": {"$ne": 1}}))
             success, fail = 0, 0
-            for u in users:
+            for u in all_users:
                 try:
                     await context.bot.send_message(u["user_id"], text)
                     success += 1
@@ -350,35 +358,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     fail += 1
             context.user_data.clear()
             await update.message.reply_text(
-                f"📢 *Broadcast Done*\n\n✅ Sent: `{success}`\n❌ Failed: `{fail}`",
+                f"📢 *Broadcast Complete*\n\n"
+                f"✅ Delivered: `{success}`\n"
+                f"❌ Failed: `{fail}`",
                 parse_mode="Markdown",
             )
             return
 
+        # ── Ban User ─────────────────────────────────────────────────────────
         if state == "await_ban_id":
             try:
                 target = int(text)
             except ValueError:
-                await update.message.reply_text("❌ Invalid User ID.")
+                await update.message.reply_text(
+                    "❌ *Invalid User ID.*\n\nSend a numeric Telegram user ID.",
+                    parse_mode="Markdown",
+                )
                 return
-            users_col.update_one({"user_id": target}, {"$set": {"banned": 1}}, upsert=True)
+            users_col.update_one(
+                {"user_id": target},
+                {"$set": {"banned": 1}},
+                upsert=True,
+            )
             try:
                 await context.bot.send_message(
                     target,
-                    "🚫 *You have been banned* from this bot.\n\nReason: Violation of rules.",
+                    "🚫 *You have been banned from this bot.*\n\nReason: Violation of rules.",
                     parse_mode="Markdown",
                 )
             except Exception:
                 pass
             context.user_data.clear()
-            await update.message.reply_text(f"✅ User `{target}` has been banned.", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"✅ User `{target}` has been *banned*.",
+                parse_mode="Markdown",
+            )
             return
 
+        # ── Unban User ───────────────────────────────────────────────────────
         if state == "await_unban_id":
             try:
                 target = int(text)
             except ValueError:
-                await update.message.reply_text("❌ Invalid User ID.")
+                await update.message.reply_text(
+                    "❌ *Invalid User ID.*\n\nSend a numeric Telegram user ID.",
+                    parse_mode="Markdown",
+                )
                 return
             users_col.update_one({"user_id": target}, {"$set": {"banned": 0}})
             try:
@@ -390,56 +415,68 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
             context.user_data.clear()
-            await update.message.reply_text(f"✅ User `{target}` has been unbanned.", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"✅ User `{target}` has been *unbanned*.",
+                parse_mode="Markdown",
+            )
             return
 
-    # ── User states ─────────────────────────────────────────────────────────
+    # ── USER STATES ──────────────────────────────────────────────────────────
 
+    # ── Red Envelope / Gift Code claim ──────────────────────────────────────
     if state == "await_gift_code":
         code = text.upper().strip()
         gift = gift_col.find_one({"code": code})
 
         if not gift:
-            await update.message.reply_text("❌ *Invalid gift code.* Please check and try again.", parse_mode="Markdown")
+            await update.message.reply_text(
+                "❌ *Invalid gift code.*\nCheck the code and try again.",
+                parse_mode="Markdown",
+            )
             context.user_data.clear()
             return
 
-        if gift.get("claimed"):
-            await update.message.reply_text("❌ *This code has already been claimed.*", parse_mode="Markdown")
+        # Per-user double-claim check (claimed is a list of user_ids)
+        claimed_by = gift.get("claimed") or []
+        if user_id in claimed_by:
+            await update.message.reply_text(
+                "❌ *You have already claimed this code.*",
+                parse_mode="Markdown",
+            )
             context.user_data.clear()
             return
 
-        # Prevent double-claim per user
-        user_data = get_user(user_id)
-        if code in (user_data.get("claimed_gifts") or []):
-            await update.message.reply_text("❌ *You have already claimed this code.*", parse_mode="Markdown")
-            context.user_data.clear()
-            return
+        reward = gift.get("amount", 0)
 
-        reward = gift["points"]
+        # Add points and record claim atomically
         users_col.update_one(
             {"user_id": user_id},
             {
                 "$inc": {"points": reward},
-                "$push": {"claimed_gifts": code},
+                "$addToSet": {"claimed_gifts": code},
             },
         )
         gift_col.update_one(
             {"code": code},
-            {"$set": {"claimed": True, "claimed_by": user_id}},
+            {"$push": {"claimed": user_id}},
         )
         context.user_data.clear()
         await update.message.reply_text(
-            f"🎉 *Red Envelope Opened!*\n\n⭐ +{reward} Points added to your wallet!",
+            f"🎉 *Red Envelope Opened!*\n\n"
+            f"🧧 Code: `{code}`\n"
+            f"⭐ +{reward} Points added to your wallet!",
             parse_mode="Markdown",
         )
         return
 
+    # ── Withdraw ─────────────────────────────────────────────────────────────
     if state == "await_withdraw":
         parts = text.split()
         if len(parts) != 2:
             await update.message.reply_text(
-                "❌ Wrong format.\n\nSend: `amount upi_id`\nExample: `100 test@upi`",
+                "❌ *Wrong format.*\n\n"
+                "Send exactly: `amount upi_id`\n"
+                "Example: `100 yourname@upi`",
                 parse_mode="Markdown",
             )
             return
@@ -447,14 +484,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             amount = int(parts[0])
         except ValueError:
-            await update.message.reply_text("❌ Amount must be a number.", parse_mode="Markdown")
+            await update.message.reply_text(
+                "❌ *Amount must be a number.*",
+                parse_mode="Markdown",
+            )
             return
 
         upi_id = parts[1]
 
         if amount < MINIMUM_WITHDRAW:
             await update.message.reply_text(
-                f"❌ Minimum withdraw is *{MINIMUM_WITHDRAW} points*.",
+                f"❌ Minimum withdrawal is *{MINIMUM_WITHDRAW} points*.",
                 parse_mode="Markdown",
             )
             return
@@ -464,22 +504,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if balance < amount:
             await update.message.reply_text(
-                f"❌ Insufficient balance.\n\n💰 Your balance: *{balance} points*",
+                f"❌ *Insufficient balance.*\n\n"
+                f"💰 Your balance: `{balance}` points\n"
+                f"💎 Requested: `{amount}` points",
                 parse_mode="Markdown",
             )
             return
 
-        # Deduct points atomically
+        # Atomic deduction — only deducts if balance is still sufficient
         result = users_col.update_one(
             {"user_id": user_id, "points": {"$gte": amount}},
             {"$inc": {"points": -amount}},
         )
 
         if result.modified_count == 0:
-            await update.message.reply_text("❌ Failed to deduct points. Try again.", parse_mode="Markdown")
+            await update.message.reply_text(
+                "❌ *Deduction failed.* Please try again.",
+                parse_mode="Markdown",
+            )
             return
 
-        # Log withdrawal
         withdraw_col.insert_one({
             "user_id": user_id,
             "amount": amount,
@@ -493,31 +537,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ *Withdrawal Request Submitted!*\n\n"
             f"⭐ Amount: `{amount}` points\n"
             f"💳 UPI: `{upi_id}`\n"
-            f"📋 Status: Pending",
+            f"📋 Status: *Pending*",
             parse_mode="Markdown",
         )
 
-        # Notify admin
-        admin_msg = (
+        log_msg = (
             f"💸 *New Withdrawal Request*\n\n"
-            f"👤 User: `{user_id}`\n"
+            f"👤 User ID: `{user_id}`\n"
             f"⭐ Amount: `{amount}` points\n"
             f"💳 UPI ID: `{upi_id}`"
         )
         try:
-            await context.bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
+            await context.bot.send_message(ADMIN_ID, log_msg, parse_mode="Markdown")
         except Exception:
             pass
-
-        # Log to channel
         try:
-            await context.bot.send_message(LOG_CHANNEL, admin_msg, parse_mode="Markdown")
+            await context.bot.send_message(LOG_CHANNEL, log_msg, parse_mode="Markdown")
         except Exception:
             pass
-
         return
 
-    # ── Menu buttons ─────────────────────────────────────────────────────────
+    # ── MENU BUTTONS ─────────────────────────────────────────────────────────
 
     if text == "💰 Wallet":
         user_data = get_user(user_id)
@@ -537,7 +577,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         context.user_data["state"] = "await_gift_code"
         await update.message.reply_text(
-            "🧧 *Red Envelope*\n\nSend your gift code to claim rewards:",
+            "🧧 *Red Envelope*\n\nSend your gift code to claim your reward:",
             parse_mode="Markdown",
         )
 
@@ -572,9 +612,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💎 *Withdraw Request*\n\n"
             f"💰 Your Balance: `{points}` points\n"
             f"📋 Minimum: `{MINIMUM_WITHDRAW}` points\n\n"
-            f"Send your request in this format:\n"
+            f"Send in this format:\n"
             f"`amount upi_id`\n\n"
-            f"Example:\n`100 yourname@upi`",
+            f"Example: `100 yourname@upi`",
             parse_mode="Markdown",
         )
 
