@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN        = "8994134922:AAEzbgLS4FUUpmJ3uQSWQPqDZ-pSLDZamuU"
 ADMIN_ID     = 8575787439
-BOT_USERNAME = "FreeRedeemCodez1Robot"
+BOT_USERNAME = "FreeUpiPayoutRobot"
 
 CHANNELS = [
     {"id": -1003745950290, "url": "https://t.me/+Lypb3Q0meWc5YzU1", "name": "Channel 1"},
